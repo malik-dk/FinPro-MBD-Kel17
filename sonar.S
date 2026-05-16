@@ -1,76 +1,95 @@
+#include "config.inc"
 
-; read_sonar1 - Baca Sensor Luar
-; TRIG: PD7 | ECHO: PB0
+.global read_sonar1
+.global read_sonar2
+
+.extern delay_10us
+.extern delay_1cm
+
 read_sonar1:
-    ; Trig low
     cbi _SFR_IO_ADDR(PORTD), TRIG1_BIT
     rcall delay_10us
-    ; Kirim pulse TRIG HIGH selama ~10us 
+
     sbi _SFR_IO_ADDR(PORTD), TRIG1_BIT
     rcall delay_10us
     rcall delay_10us
+
     cbi _SFR_IO_ADDR(PORTD), TRIG1_BIT
-    ; Tunggu ECHO naik 
+
     ldi r26, 0xFF
     ldi r27, 0x3F
-wait_echo_high1:
+
+w_h1:
     sbic _SFR_IO_ADDR(PINB), ECHO1_BIT
-    rjmp count_start1       ; ECHO sudah HIGH
+    rjmp c_start1
+
     dec r26
-    brne wait_echo_high1
+    brne w_h1
+
     dec r27
-    brne wait_echo_high1
-    clr r24               
+    brne w_h1
+
+    clr r24
     ret
 
-count_start1:
-    clr r24                 ; Reset 
-count_loop1:
+c_start1:
+    clr r24
+
+c_loop1:
     sbis _SFR_IO_ADDR(PINB), ECHO1_BIT
-    ret                     
-    rcall delay_1cm         
+    ret
+
+    rcall delay_1cm
     inc r24
+
     cpi r24, 255
-    breq sonar1_timeout
-    rjmp count_loop1
-sonar1_timeout:
-    ret                   
+    breq to1
 
+    rjmp c_loop1
 
-; read_sonar2 - Baca Sensor Dalam 
-; TRIG: PD6 | ECHO: PB2
+to1:
+    ret
+
 read_sonar2:
     cbi _SFR_IO_ADDR(PORTD), TRIG2_BIT
     rcall delay_10us
 
-    ; Kirim pulse TRIG HIGH selama ~10us
     sbi _SFR_IO_ADDR(PORTD), TRIG2_BIT
     rcall delay_10us
     rcall delay_10us
+
     cbi _SFR_IO_ADDR(PORTD), TRIG2_BIT
 
-    ; Tunggu ECHO naik 
     ldi r26, 0xFF
     ldi r27, 0x3F
-wait_echo_high2:
+
+w_h2:
     sbic _SFR_IO_ADDR(PINB), ECHO2_BIT
-    rjmp count_start2      
+    rjmp c_start2
+
     dec r26
-    brne wait_echo_high2
+    brne w_h2
+
     dec r27
-    brne wait_echo_high2
-    clr r24                 
+    brne w_h2
+
+    clr r24
     ret
 
-count_start2:
-    clr r24                 ; Reset 
-count_loop2:
+c_start2:
+    clr r24
+
+c_loop2:
     sbis _SFR_IO_ADDR(PINB), ECHO2_BIT
-    ret                 
-    rcall delay_1cm        
+    ret
+
+    rcall delay_1cm
     inc r24
+
     cpi r24, 255
-    breq sonar2_timeout
-    rjmp count_loop2
-sonar2_timeout:
-    ret                  
+    breq to2
+
+    rjmp c_loop2
+
+to2:
+    ret
