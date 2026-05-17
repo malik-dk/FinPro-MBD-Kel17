@@ -2,6 +2,7 @@
 #include "config.inc"
 
 .global main
+.global INT0_vect
 
 .extern delay_20ms
 .extern delay_2ms
@@ -41,10 +42,16 @@ main:
     ldi r16, 72
     sts TWBR, r16
 
-    clr r7
-    clr r8
-    clr r9
-    clr r10
+    clr r8  
+    clr r9  
+    clr r10 
+
+
+    ldi r16, (1 << ISC01) | (1 << ISC00)
+    sts EICRA, r16
+    ldi r16, (1 << INT0)
+    out _SFR_IO_ADDR(EIMSK), r16
+    sei 
 
     ldi r16, 0x13
     sts ICR1H, r16
@@ -82,54 +89,29 @@ main_loop:
     rcall read_sonar2   ; ini nanti ada di file sonar.S buat sensor
     mov r15, r24      
 
-    clr r16
-    sbic _SFR_IO_ADDR(PIND), BTN_BIT
-    ldi r16, 1
-
-    clr r17
-    cp r16, r7
-    breq route_mode
-
-    tst r7
-    brne update_btn
-
-    ldi r17, 1
-
-update_btn:
-    mov r7, r16
-
-route_mode:
     tst r9
     brne mode_full_logic
 
 mode_normal_logic:
     cbi _SFR_IO_ADDR(PORTB), LED_BIT
 
-    tst r17
-    breq normal_check_sensors
-
-    ldi r16, 1
-    eor r8, r16
-    mov r10, r8
-    rjmp apply_servo
-
-normal_check_sensors:
     tst r10
     brne apply_servo
 
+    ; jika tutup kebuka, sensor dalam diabaikan aja
     tst r8
     brne normal_check_luar
 
+    ; cek sensor dalam
     mov r24, r15
     cpi r24, 5
     brsh normal_check_luar
 
+    ; masuk mode penuh
     ldi r16, 1
     mov r9, r16
-
     clr r8
     clr r10
-
     sbi _SFR_IO_ADDR(PORTB), LED_BIT
     rjmp apply_servo
 
@@ -148,18 +130,6 @@ normal_auto_close:
 
 mode_full_logic:
     sbi _SFR_IO_ADDR(PORTB), LED_BIT
-
-    tst r17
-    breq apply_servo
-
-    ldi r16, 1
-    eor r8, r16
-
-    tst r8
-    brne apply_servo
-
-    clr r9
-    cbi _SFR_IO_ADDR(PORTB), LED_BIT
 
 apply_servo:
     tst r8
@@ -224,3 +194,38 @@ delay_polling:
     brne delay_polling
 
     rjmp main_loop
+
+INT0_vect:
+    push r16
+    in r16, _SFR_IO_ADDR(SREG)
+    push r16
+
+    ; cek mode
+    tst r9
+    brne isr_full_mode
+
+isr_normal_mode:
+    ; tombol ditekan di mode normal -> toggle servo
+    ldi r16, 1
+    eor r8, r16
+    mov r10, r8   
+    rjmp isr_exit
+
+isr_full_mode:
+    ldi r16, 1
+    eor r8, r16
+    
+    ; jika ditutup lagi, keluar dari mode penuh
+    tst r8
+    brne isr_exit       ; kalo buka, tetep mode penuh
+    clr r9              ; jika tutup, reset ke normal
+    cbi _SFR_IO_ADDR(PORTB), LED_BIT
+
+isr_exit:
+    ldi r16, (1<<INTF0)
+    out _SFR_IO_ADDR(EIFR), r16
+
+    pop r16
+    out _SFR_IO_ADDR(SREG), r16
+    pop r16
+    reti
